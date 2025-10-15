@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Fondo claro global y sin centrado raro */
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #f8fafc; /* claro; podés cambiarlo o quitarlo */
+  color: #0a0a0a;
+}
+
+/* Que #root no tenga ancho max ni padding del template */
+#root {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
