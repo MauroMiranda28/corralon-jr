@@ -1,34 +1,62 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { ShoppingCart, LogIn, LogOut, Package, Truck, CheckCircle2, Settings, Plus, Minus, Trash2, Filter, BarChart3, User, RefreshCcw, Edit3, Save, X, Download } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
-import { LS_KEYS, ORDER_STATUSES, uid, toARS } from "../utils/utils.js";
+import React, { useState } from "react";
+import { Edit3, Save } from "lucide-react";
 import TextField from "./TextField.jsx";
 import NumberField from "./NumberField.jsx";
+import { toARS, uid } from "../utils/utils.js";
+import { productsApi } from "../services/products.supabase.js";
 
-export default function Panel({ products, setProducts, orders, setOrderStatus, users }) {
+export default function Panel({ products, setProducts /*, orders, setOrderStatus, users */ }) {
   const [editing, setEditing] = useState(null); // id o null
   const [form, setForm] = useState({ name: "", brand: "", category: "", price: 0, stock: 0 });
+  const [busy, setBusy] = useState(false);
 
-  function startEdit(p) { setEditing(p.id); setForm({ name: p.name, brand: p.brand, category: p.category, price: p.price, stock: p.stock }); }
-  function cancelEdit() { setEditing(null); setForm({ name: "", brand: "", category: "", price: 0, stock: 0 }); }
+  function startEdit(p) {
+    setEditing(p.id);
+    setForm({ name: p.name, brand: p.brand, category: p.category, price: p.price, stock: p.stock });
+  }
+  function cancelEdit() {
+    setEditing(null);
+    setForm({ name: "", brand: "", category: "", price: 0, stock: 0 });
+  }
 
-  function saveProduct() {
+  async function saveProduct() {
     if (!form.name || !form.category || !form.brand) return alert("Completá nombre, marca y categoría");
     if (form.price <= 0) return alert("Precio inválido");
     if (form.stock < 0) return alert("Stock inválido");
-    if (editing) {
-      setProducts(products.map(p => p.id === editing ? { ...p, ...form } : p));
+
+    try {
+      setBusy(true);
+      const payload = editing
+        ? { id: editing, ...form }
+        : { id: uid("prd"), img: "", ...form };
+
+      await productsApi.save(payload);               // upsert en Supabase
+      const fresh = await productsApi.all();         // refrescar grilla
+      setProducts(fresh);
+
       cancelEdit();
-    } else {
-      setProducts([{ id: uid("prd"), img: "", ...form }, ...products]);
-      cancelEdit();
+    } catch (e) {
+      console.error(e);
+      alert("No pude guardar el producto en la base");
+    } finally {
+      setBusy(false);
     }
   }
 
-  function deleteProduct(id) {
+  async function deleteProduct(id) {
     if (!confirm("¿Eliminar producto?")) return;
-    setProducts(products.filter(p => p.id !== id));
+    try {
+      setBusy(true);
+      await productsApi.remove(id);
+      const fresh = await productsApi.all();
+      setProducts(fresh);
+      if (editing === id) cancelEdit();
+    } catch (e) {
+      console.error(e);
+      alert("No pude eliminar el producto en la base");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -56,11 +84,30 @@ export default function Panel({ products, setProducts, orders, setOrderStatus, u
                   <td className="p-2 text-right">{toARS(p.price)}</td>
                   <td className="p-2 text-right">{p.stock}</td>
                   <td className="p-2 text-right">
-                    <button onClick={() => startEdit(p)} className="rounded-lg border px-2 py-1 text-xs hover:bg-neutral-50"><Edit3 className="mr-1 inline h-3 w-3"/> Editar</button>
-                    <button onClick={() => deleteProduct(p.id)} className="ml-2 rounded-lg border px-2 py-1 text-xs hover:bg-neutral-50 text-red-700">Eliminar</button>
+                    <button
+                      onClick={() => startEdit(p)}
+                      className="rounded-lg border px-2 py-1 text-xs hover:bg-neutral-50 disabled:opacity-50"
+                      disabled={busy}
+                    >
+                      <Edit3 className="mr-1 inline h-3 w-3" /> Editar
+                    </button>
+                    <button
+                      onClick={() => deleteProduct(p.id)}
+                      className="ml-2 rounded-lg border px-2 py-1 text-xs text-red-700 hover:bg-neutral-50 disabled:opacity-50"
+                      disabled={busy}
+                    >
+                      Eliminar
+                    </button>
                   </td>
                 </tr>
               ))}
+              {products.length === 0 && (
+                <tr>
+                  <td className="p-4 text-center text-neutral-500" colSpan={6}>
+                    No hay productos cargados.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -79,25 +126,37 @@ export default function Panel({ products, setProducts, orders, setOrderStatus, u
             <NumberField label="Stock" value={form.stock} onChange={(v) => setForm({ ...form, stock: v })} />
           </div>
           <div className="flex items-center justify-end gap-2">
-            {editing && <button onClick={cancelEdit} className="rounded-xl px-3 py-2 text-sm hover:bg-neutral-100">Cancelar</button>}
-            <button onClick={saveProduct} className="rounded-xl bg-neutral-900 px-3 py-2 text-sm text-white hover:bg-neutral-800">
-              <Save className="mr-1 inline h-4 w-4"/> Guardar
+            {editing && (
+              <button
+                onClick={cancelEdit}
+                className="rounded-xl px-3 py-2 text-sm hover:bg-neutral-100 disabled:opacity-50"
+                disabled={busy}
+              >
+                Cancelar
+              </button>
+            )}
+            <button
+              onClick={saveProduct}
+              className="rounded-xl bg-neutral-900 px-3 py-2 text-sm text-white hover:bg-neutral-800 disabled:opacity-50"
+              disabled={busy}
+            >
+              <Save className="mr-1 inline h-4 w-4" /> {busy ? "Guardando..." : "Guardar"}
             </button>
           </div>
         </div>
-      
+
         <h3 className="mb-3 mt-6 text-lg font-semibold">Flujo de pedidos</h3>
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 text-sm text-neutral-600">
           <ol className="list-inside list-decimal space-y-1">
             <li>Cliente crea pedido (pendiente)</li>
             <li>Vendedor cambia a <span className="rounded bg-sky-50 px-1">en preparación</span></li>
             <li>Cuando está listo: <span className="rounded bg-purple-50 px-1">listo</span></li>
+            <li>Al enviar: <span className="rounded bg-blue-50 px-1">enviado</span></li>
             <li>Al entregar: <span className="rounded bg-emerald-50 px-1">entregado</span></li>
           </ol>
           <p className="mt-2">Los cambios notifican automáticamente al cliente.</p>
         </div>
       </div>
-      
     </section>
   );
 }

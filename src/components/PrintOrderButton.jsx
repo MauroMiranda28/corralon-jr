@@ -1,9 +1,7 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { ShoppingCart, LogIn, LogOut, Package, Truck, CheckCircle2, Settings, Plus, Minus, Trash2, Filter, BarChart3, User, RefreshCcw, Edit3, Save, X, Download } from "lucide-react";
+import React, { useState } from "react";
+import { X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
-import { LS_KEYS, ORDER_STATUSES, uid, toARS } from "../utils/utils.js";
-
+import { toARS } from "../utils/utils.js";
 
 export default function PrintOrderButton({ order, products, user }) {
   const [open, setOpen] = useState(false);

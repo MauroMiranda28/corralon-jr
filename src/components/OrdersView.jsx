@@ -1,13 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { ShoppingCart, LogIn, LogOut, Package, Truck, CheckCircle2, Settings, Plus, Minus, Trash2, Filter, BarChart3, User, RefreshCcw, Edit3, Save, X, Download } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
+import React from "react";
 import StatusBadge from "./StatusBadge";
 import StatusChanger from "./StatusChanger";
 import PrintOrderButton from "./PrintOrderButton";
-import { LS_KEYS, ORDER_STATUSES, uid, toARS } from "../utils/utils.js";
-
-
+import { toARS } from "../utils/utils.js";
 
 export default function OrdersView({ orders, users, products, currentUser, onStatusChange, onExportCSV }) {
   return (
@@ -15,7 +10,7 @@ export default function OrdersView({ orders, users, products, currentUser, onSta
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-lg font-semibold">{currentUser?.role === "cliente" ? "Mis pedidos" : "Pedidos del sistema"}</h3>
         {currentUser?.role !== "cliente" && (
-          <button onClick={onExportCSV} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2"><Download className="h-4 w-4"/> Exportar CSV</button>
+          <button onClick={onExportCSV} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm hover:bg-neutral-50 flex items-center gap-2">Exportar CSV</button>
         )}
       </div>
 

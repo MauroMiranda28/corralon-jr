@@ -1,9 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { ShoppingCart, LogIn, LogOut, Package, Truck, CheckCircle2, Settings, Plus, Minus, Trash2, Filter, BarChart3, User, RefreshCcw, Edit3, Save, X, Download } from "lucide-react";
+import React, { useState } from "react";
+import { ShoppingCart, LogIn, LogOut, Package, RefreshCcw, User, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
-import { LS_KEYS, ORDER_STATUSES, uid, toARS } from "../utils/utils.js";
-
 
 export default function Header({ currentUser, users, onLogin, onLogout, cartCount, onOpenCart, onOpenNotifications, onResetDemo }) {
   const [openLogin, setOpenLogin] = useState(false);
@@ -18,24 +15,14 @@ export default function Header({ currentUser, users, onLogin, onLogout, cartCoun
           </div>
         </div>
         <div className="flex items-center gap-1 sm:gap-2">
-          <button
-            className="relative rounded-xl px-3 py-2 text-sm hover:bg-neutral-100 flex items-center gap-2"
-            onClick={onOpenCart}
-            title="Carrito"
-          >
+          <button className="relative rounded-xl px-3 py-2 text-sm hover:bg-neutral-100 flex items-center gap-2" onClick={onOpenCart} title="Carrito">
             <ShoppingCart className="h-5 w-5" />
             <span className="hidden sm:inline">Carrito</span>
-            {cartCount > 0 && (
-              <span className="ml-1 rounded-full bg-emerald-600 px-2 py-0.5 text-xs text-white">{cartCount}</span>
-            )}
+            {cartCount > 0 && <span className="ml-1 rounded-full bg-emerald-600 px-2 py-0.5 text-xs text-white">{cartCount}</span>}
           </button>
 
           {currentUser && (
-            <button
-              className="rounded-xl px-3 py-2 text-sm hover:bg-neutral-100 flex items-center gap-2"
-              onClick={onOpenNotifications}
-              title="Notificaciones"
-            >
+            <button className="rounded-xl px-3 py-2 text-sm hover:bg-neutral-100 flex items-center gap-2" onClick={onOpenNotifications} title="Notificaciones">
               <Package className="h-5 w-5" />
               <span className="hidden sm:inline">Avisos</span>
             </button>
@@ -44,10 +31,7 @@ export default function Header({ currentUser, users, onLogin, onLogout, cartCoun
           <div className="h-6 w-px bg-neutral-200 mx-1 hidden sm:block" />
 
           {!currentUser ? (
-            <button
-              className="rounded-xl bg-neutral-900 px-3 py-2 text-sm text-white hover:bg-neutral-800 flex items-center gap-2"
-              onClick={() => setOpenLogin(true)}
-            >
+            <button className="rounded-xl bg-neutral-900 px-3 py-2 text-sm text-white hover:bg-neutral-800 flex items-center gap-2" onClick={() => setOpenLogin(true)}>
               <LogIn className="h-5 w-5" /> Ingresar
             </button>
           ) : (
@@ -64,9 +48,9 @@ export default function Header({ currentUser, users, onLogin, onLogout, cartCoun
             </div>
           )}
 
-          <button className="rounded-xl px-3 py-2 text-sm hover:bg-neutral-100 flex items-center gap-2" onClick={onResetDemo} title="Reiniciar demo">
+          <button className="rounded-xl px-3 py-2 text-sm hover:bg-neutral-100 flex items-center gap-2" onClick={onResetDemo} title="Recargar BD">
             <RefreshCcw className="h-5 w-5" />
-            <span className="hidden sm:inline">Reiniciar</span>
+            <span className="hidden sm:inline">Recargar</span>
           </button>
         </div>
       </div>
@@ -74,24 +58,18 @@ export default function Header({ currentUser, users, onLogin, onLogout, cartCoun
       <AnimatePresence>
         {openLogin && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 grid place-items-center bg-black/30 p-4"
-            onClick={() => setOpenLogin(false)}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 grid place-items-center bg-black/30 p-4" onClick={() => setOpenLogin(false)}
           >
             <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 20, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+              initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
             >
               <div className="mb-4 flex items-center gap-2">
                 <LogIn className="h-5 w-5" />
-                <h2 className="text-lg font-semibold">Inicia sesion</h2>
+                <h2 className="text-lg font-semibold">Inicia sesión</h2>
               </div>
-              <p className="text-sm text-neutral-600 mb-4">Elige un usuario</p>
+              <p className="text-sm text-neutral-600 mb-4">Elegí un usuario</p>
               <div className="space-y-2">
                 {users.map(u => (
                   <button key={u.id} onClick={() => { onLogin(u.id); setOpenLogin(false); }}

@@ -1,101 +1,42 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ShoppingCart, LogIn, LogOut, Package, Truck, CheckCircle2, Settings, Plus, Minus, Trash2, Filter, BarChart3, User, RefreshCcw, Edit3, Save, X, Download } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
-import { storage } from "./services/storage.js";
-import { products } from "./services/products.js"; 
 import Header from "./components/Header.jsx";
 import Catalog from "./components/Catalog.jsx";
 import CartDrawer from "./components/CartDrawer.jsx";
 import OrdersView from "./components/OrdersView.jsx";
-import PrintOrderButton from "./components/PrintOrderButton.jsx";
-import StatusBadge from "./components/StatusBadge.jsx";
-import StatusChanger from "./components/StatusChanger.jsx";
-import TopTabs from "./components/TopTabs.jsx";
-import NumberField from "./components/NumberField.jsx";
-import TextField from "./components/TextField.jsx";
-import NotificationsDrawer from "./components/NotificationsDrawer.jsx";
 import Panel from "./components/Panel.jsx";
 import Reports from "./components/Reports.jsx";
-import { LS_KEYS, ORDER_STATUSES, uid, toARS } from "./utils/utils.js";
+import TopTabs from "./components/TopTabs.jsx";
+import NotificationsDrawer from "./components/NotificationsDrawer.jsx";
 
+import { productsApi as ProductsSB } from "./services/products.supabase.js";
+import { ordersApi   as OrdersSB   } from "./services/orders.supabase.js";
+import { toARS, uid } from "./utils/utils.js";
 
-// --- Datos semilla ---
-const seedProducts = () => ([
-  { id: uid("prd"), name: "Cemento Portland x50kg", category: "Cementos", brand: "Loma Negra", price: 9500, stock: 42, img: "/products/cemento.jpg" },
-  { id: uid("prd"), name: "Cal hidratada x25kg", category: "Cal", brand: "Cacique", price: 5200, stock: 35, img: "/products/cal.jpg" },
-  { id: uid("prd"), name: "Arena fina m³", category: "Áridos", brand: "Bolson", price: 18000, stock: 12, img: "/products/arena.jpg" },
-  { id: uid("prd"), name: "Ladrillo común", category: "Ladrillos", brand: "Rojo 18x18x33", price: 600, stock: 2000, img: "/products/ladrillo.jpg" },
-  { id: uid("prd"), name: "Hierro 8mm barra 12m", category: "Hierros", brand: "Acindar", price: 7800, stock: 100, img: "/products/hierro.jpg" },
-  { id: uid("prd"), name: "Chapa sinusoidal N°25 3m", category: "Chapas", brand: "Zinc", price: 31000, stock: 24, img: "/products/chapa.jpg" },
-]);
-
-const seedUsers = () => ([
-  { id: uid("usr"), name: "Juan Gómez", role: "cliente" },
-  { id: uid("usr"), name: "María Herrera", role: "vendedor" },
-  { id: uid("usr"), name: "Pedro Suárez", role: "admin" },
-]);
-
-// --- Hooks de almacenamiento, persisten entre f5c
-// src/hooks/useLocalState.js  (o donde lo tengas)
- // <-- usa el wrapper
-
-export function useLocalState(key, initialFactory) {
-  const [state, setState] = useState(() => {
-    const saved = storage.get(key);
-    if (saved != null) return saved;
-    const initial =
-      typeof initialFactory === "function" ? initialFactory() : initialFactory;
-    storage.set(key, initial);
-    return initial;
-  });
-
-  useEffect(() => {
-    storage.set(key, state);
-  }, [key, state]);
-
-  return [state, setState];
-}
-
-// --- Notificaciones por usuario ---
-function pushNotification(userId, text) {
-  const all = storage.get(LS_KEYS.notifications, {}); // <- ya viene objeto
-  const list = all[userId] || [];
-  const item = { id: uid("ntf"), text, ts: Date.now(), read: false };
-  all[userId] = [item, ...list].slice(0, 50);
-  storage.set(LS_KEYS.notifications, all); // <- NO stringify
-}
-
-function popUserNotifications(userId) {
-  const all = storage.get(LS_KEYS.notifications, {});
-  return all[userId] || [];
-}
-function markAllRead(userId) {
-  const all = storage.get(LS_KEYS.notifications, {});
-  if (all[userId]) {
-    all[userId] = all[userId].map((n) => ({ ...n, read: true }));
-    storage.set(LS_KEYS.notifications, all);
-  }
-}
-
-// --- App principal ---
 export default function App() {
-  const [products, setProducts] = useLocalState(LS_KEYS.products, () => seedProducts());
-  const [orders, setOrders] = useLocalState(LS_KEYS.orders, () => []);
-  const [users, setUsers] = useLocalState(LS_KEYS.users, () => seedUsers());
-  const [session, setSession] = useLocalState(LS_KEYS.session, () => ({ userId: users[0]?.id || null }));
+  // Estado global (todo viene de la BD)
+  const [products, setProducts] = useState([]);
+  const [orders, setOrders]     = useState([]);
+  const [users, setUsers]       = useState([]);
+  const [session, setSession]   = useState({ userId: null }); // sesión en memoria
+
+  // Notificaciones en memoria (ya no persisten en LS)
+  const [notifications, setNotifications] = useState([]);
+
   const currentUser = useMemo(() => users.find((u) => u.id === session?.userId) || null, [users, session]);
   const canSeeStock = !!currentUser && currentUser.role !== "cliente";
-  const isAdmin = currentUser?.role === "admin"
 
+  // UI
   const [cartOpen, setCartOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [tab, setTab] = useState("catalogo");
 
-  // Carrito simple en estado (no en LS para simplificar la demo entre usuarios)
+  // Carrito (en memoria)
   const [cart, setCart] = useState([]); // [{productId, qty}]
   const cartCount = useMemo(() => cart.reduce((a, b) => a + b.qty, 0), [cart]);
-  const cartTotal = useMemo(() => cart.reduce((sum, it) => sum + (products.find(p => p.id === it.productId)?.price || 0) * it.qty, 0), [cart, products]);
+  const cartTotal = useMemo(
+    () => cart.reduce((sum, it) => sum + (products.find(p => p.id === it.productId)?.price || 0) * it.qty, 0),
+    [cart, products]
+  );
 
   // Filtros catálogo
   const [q, setQ] = useState("");
@@ -114,22 +55,37 @@ export default function App() {
     });
   }, [products, q, fCategory, fBrand]);
 
-  // Notificaciones del usuario actual
-  const [userNtf, setUserNtf] = useState([]);
+  // --- Carga inicial: productos, pedidos, usuarios (desde BD) ---
   useEffect(() => {
-    if (currentUser) setUserNtf(popUserNotifications(currentUser.id));
-  }, [currentUser, orders]);
+    (async () => {
+      try {
+        const [p, o] = await Promise.all([ProductsSB.all(), OrdersSB.all()]);
+        setProducts(p);
+        setOrders(o);
+      } catch (err) {
+        console.error("Error cargando productos/pedidos:", err);
+        alert("No pude cargar datos de la base.");
+      }
+    })();
+  }, []);
 
+  // Cargar usuarios (para el modal simple de login) — desde tabla `users`
+  useEffect(() => {
+    (async () => {
+      try {
+        const mod = await import("./services/users.supabase.js");      // carga perezosa
+        const list = await mod.usersApi.all();
+        setUsers(list);
+        // si querés autologin del primero:
+        if (!session.userId && list[0]) setSession({ userId: list[0].id });
+      } catch (e) {
+        console.error("Error cargando usuarios:", e);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-function resetDemo() {
-  ["jr_products","jr_orders","jr_users","jr_session","jr_notifications","jr_stock_movs"]
-    .forEach(k => storage.remove(k));
-  location.reload();
-}
-
-  function loginAs(userId) { setSession({ userId }); setNotificationsOpen(false); }
-  function logout() { setSession({ userId: null }); setCart([]); }
-
+  // Helpers carrito
   function addToCart(productId) {
     const p = products.find(p => p.id === productId);
     if (!p) return;
@@ -154,53 +110,73 @@ function resetDemo() {
   }
   function removeFromCart(productId) { setCart(cart.filter(it => it.productId !== productId)); }
 
-  function confirmOrder() {
+  // Crear pedido (BD)
+  async function confirmOrder() {
     if (!currentUser || currentUser.role !== "cliente") return alert("Ingresá como Cliente para confirmar");
-    if (cart.length === 0) return alert("Tu carrito está vacío");
-    // Validar stock
+    if (!cart.length) return alert("Tu carrito está vacío");
+
+    // Validación rápida UI
     for (const it of cart) {
       const p = products.find(p => p.id === it.productId);
-      if (!p || p.stock < it.qty) {
-        return alert(`Sin stock suficiente para ${p?.name || it.productId}`);
-      }
+      if (!p || p.stock < it.qty) return alert(`Sin stock suficiente para ${p?.name || it.productId}`);
     }
-    // Crear pedido
-    const order = {
-      id: uid("ord"),
-      clientId: currentUser.id,
-      items: cart.map(it => ({ productId: it.productId, qty: it.qty, price: products.find(p => p.id === it.productId)?.price || 0 })),
-      total: cart.reduce((s, it) => s + (products.find(p => p.id === it.productId)?.price || 0) * it.qty, 0),
-      status: "pendiente",
-      createdAt: Date.now(),
-      delivery: "retiro", // demo
-      payment: "transferencia", // demo
-    };
-    setOrders([order, ...orders]);
-    // Descontar stock
-    const updated = products.map(p => {
-      const it = cart.find(i => i.productId === p.id);
-      return it ? { ...p, stock: p.stock - it.qty } : p;
-    });
-    setProducts(updated);
-    setCart([]);
-    setCartOpen(false);
-    alert("Pedido creado. Estado: pendiente");
+
+    try {
+      const orderUi = {
+        id: uid("ord"),
+        clientId: currentUser.id,
+        delivery: "retiro",
+        payment: "transferencia",
+        address: "",
+        items: cart.map(it => ({
+          id: uid("itm"),
+          productId: it.productId,
+          qty: it.qty,
+          price: products.find(p => p.id === it.productId)?.price || 0
+        }))
+      };
+      await OrdersSB.create(orderUi);                       // RPC transaccional
+      const [p, o] = await Promise.all([ProductsSB.all(), OrdersSB.all()]);
+      setProducts(p);
+      setOrders(o);
+      setCart([]);
+      setCartOpen(false);
+      alert("Pedido creado. Estado: Pendiente");
+    } catch (e) {
+      console.error(e);
+      alert("Error creando el pedido en la base");
+    }
   }
 
-  function setOrderStatus(oid, newStatus) {
-    setOrders((prev) => prev.map(o => o.id === oid ? { ...o, status: newStatus } : o));
-    const ord = orders.find(o => o.id === oid);
-    if (ord) pushNotification(ord.clientId, `Tu pedido ${oid.slice(-6)} ahora está "${newStatus}".`);
+  // Cambiar estado (BD) + notificación en memoria
+  async function setOrderStatus(oid, newStatus) {
+    try {
+      const updated = await OrdersSB.setStatus(oid, newStatus);
+      setOrders(prev => {
+        const i = prev.findIndex(o => o.id === oid);
+        if (i < 0) return prev;
+        const cp = [...prev]; cp[i] = updated; return cp;
+      });
+
+      // Notificación (en memoria)
+      setNotifications((prev) => {
+        const text = `Tu pedido ${oid.slice(-6)} ahora está "${newStatus}".`;
+        return [{ id: uid("ntf"), text, ts: Date.now(), read: false }, ...prev].slice(0, 50);
+      });
+    } catch (e) {
+      console.error(e);
+      alert("No pude actualizar el estado en la base");
+    }
   }
 
   function ordersForUser() {
     if (!currentUser) return [];
     if (currentUser.role === "cliente") return orders.filter(o => o.clientId === currentUser.id);
-    return orders; // vendedor/admin ven todos
+    return orders;
   }
 
+  // Reportes: ventas por producto (solo entregados)
   const ventasPorProducto = useMemo(() => {
-    // solo pedidos entregados
     const entregados = orders.filter(o => o.status === "entregado");
     const acc = new Map();
     for (const o of entregados) {
@@ -214,21 +190,28 @@ function resetDemo() {
     return Array.from(acc.entries()).map(([name, total]) => ({ name, total }));
   }, [orders, products]);
 
-  function exportOrdersCSV() {
-    const headers = ["id","cliente","estado","fecha","total"];
-    const rows = orders.map(o => [
-      o.id,
-      users.find(u => u.id === o.clientId)?.name || o.clientId,
-      o.status,
-      new Date(o.createdAt).toLocaleString(),
-      o.total,
-    ]);
-    const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "pedidos.csv"; a.click();
-    URL.revokeObjectURL(url);
+  // Reset: solo re-fetch desde BD (sin LS)
+  async function resetFromDB() {
+    try {
+      const [p, o] = await Promise.all([ProductsSB.all(), OrdersSB.all()]);
+      setProducts(p);
+      setOrders(o);
+      setCart([]);
+      setNotifications([]);
+      alert("Datos recargados desde la base.");
+    } catch (e) {
+      console.error(e);
+      alert("No pude recargar desde la base.");
+    }
+  }
+
+  function loginAs(userId) { setSession({ userId }); setNotificationsOpen(false); }
+  function logout() { setSession({ userId: null }); setCart([]); }
+
+  // Abrir notificaciones marca como leídas (en memoria)
+  function openNotifications() {
+    setNotificationsOpen(true);
+    setNotifications((prev) => prev.map(n => ({ ...n, read: true })));
   }
 
   return (
@@ -236,12 +219,12 @@ function resetDemo() {
       <Header
         currentUser={currentUser}
         users={users}
-        onLogin={loginAs}
+        onLogin={(id)=>loginAs(id)}
         onLogout={logout}
         cartCount={cartCount}
         onOpenCart={() => setCartOpen(true)}
-        onOpenNotifications={() => { setNotificationsOpen(true); markAllRead(currentUser?.id); setUserNtf(popUserNotifications(currentUser?.id)); }}
-        onResetDemo={resetDemo}
+        onOpenNotifications={openNotifications}
+        onResetDemo={resetFromDB}
       />
 
       <main className="mx-auto max-w-7xl px-4 pb-24">
@@ -267,7 +250,22 @@ function resetDemo() {
             products={products}
             currentUser={currentUser}
             onStatusChange={setOrderStatus}
-            onExportCSV={exportOrdersCSV}
+            onExportCSV={()=>{
+              const headers = ["id","cliente","estado","fecha","total"];
+              const rows = orders.map(o => [
+                o.id,
+                users.find(u => u.id === o.clientId)?.name || o.clientId,
+                o.status,
+                new Date(o.createdAt).toLocaleString(),
+                o.total,
+              ]);
+              const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+              const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url; a.download = "pedidos.csv"; a.click();
+              URL.revokeObjectURL(url);
+            }}
           />
         )}
 
@@ -301,13 +299,8 @@ function resetDemo() {
       <NotificationsDrawer
         open={notificationsOpen}
         onClose={() => setNotificationsOpen(false)}
-        items={userNtf}
+        items={notifications}
       />
     </div>
   );
 }
-
-
-
-
-
