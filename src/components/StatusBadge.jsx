@@ -3,7 +3,6 @@ import { Package, Truck, CheckCircle2, Settings } from "lucide-react";
 
 const LABEL = {
   pendiente: "Pendiente",
-  en_preparacion: "En preparación",
   listo: "Listo",
   enviado: "Enviado",
   entregado: "Entregado",
@@ -13,7 +12,6 @@ export default function StatusBadge({ status }) {
   const color =
     {
       pendiente: "bg-amber-50 text-amber-700",
-      en_preparacion: "bg-sky-50 text-sky-700",
       listo: "bg-purple-50 text-purple-700",
       enviado: "bg-blue-50 text-blue-700",
       entregado: "bg-emerald-50 text-emerald-700",
@@ -22,7 +20,6 @@ export default function StatusBadge({ status }) {
   const Icon =
     {
       pendiente: Package,
-      en_preparacion: Settings,
       listo: Truck,
       enviado: Truck,
       entregado: CheckCircle2,

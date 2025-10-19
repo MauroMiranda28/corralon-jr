@@ -144,18 +144,6 @@ export default function Panel({ products, setProducts /*, orders, setOrderStatus
             </button>
           </div>
         </div>
-
-        <h3 className="mb-3 mt-6 text-lg font-semibold">Flujo de pedidos</h3>
-        <div className="rounded-2xl border border-neutral-200 bg-white p-4 text-sm text-neutral-600">
-          <ol className="list-inside list-decimal space-y-1">
-            <li>Cliente crea pedido (pendiente)</li>
-            <li>Vendedor cambia a <span className="rounded bg-sky-50 px-1">en preparación</span></li>
-            <li>Cuando está listo: <span className="rounded bg-purple-50 px-1">listo</span></li>
-            <li>Al enviar: <span className="rounded bg-blue-50 px-1">enviado</span></li>
-            <li>Al entregar: <span className="rounded bg-emerald-50 px-1">entregado</span></li>
-          </ol>
-          <p className="mt-2">Los cambios notifican automáticamente al cliente.</p>
-        </div>
       </div>
     </section>
   );

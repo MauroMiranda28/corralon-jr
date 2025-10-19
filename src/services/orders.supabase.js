@@ -11,8 +11,6 @@ export const ordersApi = {
     return data.map(fromDBOrder);
   },
 
-  // orderUi esperado por la UI:
-  // { id, clientId, delivery, payment, address, items:[{ id, productId, qty, price }] }
   async create(orderUi) {
     const payload = {
       id: orderUi.id,
@@ -27,19 +25,33 @@ export const ordersApi = {
         precio: it.price
       }))
     };
-    const { data, error } = await supabase.rpc("create_order", { order_json: payload });
-    if (error) throw error;
-    return fromDBOrder(data);
+     const { data, error } = await supabase.rpc("create_order", { order_json: payload });
+     if (error) {
+         console.error("Error calling create_order RPC:", error);
+         throw error;
+     }
+     return fromDBOrder(data);
   },
 
+  // --- FUNCIÓN setStatus SUPER SIMPLIFICADA (PARA DEBUG) ---
   async setStatus(id, status) {
-    const { data, error } = await supabase
+    console.log(`[orders.supabase.js] Attempting to update order ${id} to status ${status}`); // Log
+    const { error } = await supabase // Quitamos 'data' porque no esperamos respuesta
       .from("orders")
-      .update({ status })
-      .eq("id", id)
-      .select("*, order_items(*)")
-      .single();
-    if (error) throw error;
-    return fromDBOrder(data);
+      .update({ status: status })
+      .eq("id", id);
+      // >>> HEMOS QUITADO .select().single() COMPLETAMENTE <<<
+
+    if (error) {
+      // Este es el error que ves en la consola (orders.supabase.js:50)
+      console.error(`[orders.supabase.js] Error updating order ${id} to ${status}:`, error);
+      throw error; // Propaga el error para que App.jsx muestre el alert
+    }
+
+    // Si llegamos aquí, el UPDATE funcionó, pero no tenemos la data actualizada.
+    // Devolvemos un objeto simple para que App.jsx sepa que funcionó.
+    console.log(`[orders.supabase.js] Update for order ${id} to ${status} seems successful.`);
+    return { id: id, status: status }; // Devuelve solo ID y el nuevo estado
   }
+  // --- FIN FUNCIÓN setStatus SUPER SIMPLIFICADA ---
 };
