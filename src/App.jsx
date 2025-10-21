@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
+// Importar hook de navegación si estás usando react-router-dom v6+
+import { useNavigate } from 'react-router-dom';
 import Header from "./components/Header.jsx";
 import Catalog from "./components/Catalog.jsx";
 import CartDrawer from "./components/CartDrawer.jsx";
@@ -61,6 +63,9 @@ export default function App() {
     });
   }, [products, q, fCategory, fBrand]);
 
+  // Hook de navegación
+  const navigate = useNavigate();
+
   // --- Carga inicial de datos ---
   useEffect(() => {
     (async () => {
@@ -80,26 +85,53 @@ export default function App() {
     })();
   }, []);
 
-  // --- GESTIÓN DE SESIÓN ---
+  // --- GESTIÓN DE SESIÓN (MODIFICADO PARA PASSWORD_RECOVERY con redirectTo) ---
   useEffect(() => {
     setLoadingSession(true);
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+
+    // 1. Obtener sesión inicial
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      setSession(initialSession);
       setLoadingSession(false);
+      console.log("Initial session processed");
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => { setSession(session); });
+
+    // 2. Escuchar cambios de estado
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, currentSession) => {
+        console.log("Auth Event:", event, currentSession);
+
+        // Si el evento es PASSWORD_RECOVERY Y tenemos sesión,
+        // significa que el usuario acaba de llegar del enlace del email.
+        // Navegamos a nuestra página personalizada.
+        if (event === 'PASSWORD_RECOVERY' && currentSession) {
+            console.log("Password recovery event detected, navigating to /update-password");
+            navigate('/update-password');
+            // IMPORTANTE: NO establecemos la sesión principal aquí
+        } else {
+            // Para todos los demás eventos, actualizamos la sesión principal.
+            setSession(currentSession);
+        }
+      }
+    );
+
+    // 3. Limpiar suscripción
     return () => subscription.unsubscribe();
-  }, []);
+  }, [navigate]); // Añadir navigate a las dependencias
+  // --- FIN GESTIÓN DE SESIÓN ---
 
   // --- BUSCAR EL PERFIL ---
   useEffect(() => {
+    // Este efecto se ejecuta cuando 'session' o 'users' cambian.
     if (session?.user && users.length > 0) {
       const profile = users.find((u) => u.id === session.user.id);
       setCurrentUser(profile || null);
+      console.log("Current user profile:", profile);
     } else if (!session) {
       setCurrentUser(null);
+      console.log("No session, currentUser set to null");
     }
-  }, [session, users]);
+  }, [session, users]); // Se re-ejecuta si cambia la sesión o la lista de usuarios
 
 
   // --- Helpers Carrito ---
@@ -149,9 +181,9 @@ export default function App() {
       const orderUi = {
         id: uid("ord"),
         clientId: currentUser.id,
-        delivery: "retiro", // TODO: Permitir elegir
-        payment: "transferencia", // TODO: Integrar MercadoPago
-        address: "", // TODO: Pedir si es envío
+        delivery: "retiro",
+        payment: "transferencia",
+        address: "",
         items: cart.map((it) => ({
           id: uid("itm"),
           productId: it.productId,
@@ -200,7 +232,6 @@ export default function App() {
 
         newOrders[orderIndex] = {
           ...existingOrder,
-          // Solo actualizamos el estado recibido de la API simplificada
           status: minimalUpdateResult.status,
           delivery_confirmed_at: newStatus === 'entregado' ? new Date().toISOString() : existingOrder.delivery_confirmed_at,
         };
@@ -215,7 +246,7 @@ export default function App() {
       });
 
     } catch (e) {
-      console.error(`[App.jsx] Error caught updating status for order ${oid}:`, e); // Línea ~212
+      console.error(`[App.jsx] Error caught updating status for order ${oid}:`, e);
       alert("No pude actualizar el estado en la base");
     }
   }
@@ -308,6 +339,23 @@ export default function App() {
       setLoadingSession(false);
     }
   }
+
+  async function handlePasswordResetRequest(email) {
+    try {
+      setLoadingSession(true);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        // AHORA SÍ especificamos redirectTo
+        redirectTo: `${window.location.origin}/update-password`, // Usa el origen actual + tu ruta
+      });
+      if (error) throw error;
+      alert(`Si ${email} está registrado, recibirás un correo con instrucciones.`);
+    } catch (error) {
+      console.error("Error al solicitar reseteo:", error.message);
+      alert(`Ocurrió un error. Intenta de nuevo.`);
+    } finally {
+      setLoadingSession(false);
+    }
+  }
   // --- FIN FUNCIONES AUTH ---
 
   // Marca notificaciones como leídas
@@ -326,6 +374,9 @@ export default function App() {
    }
 
   // --- RENDERIZADO PRINCIPAL ---
+  // Nota: Con react-router-dom, App.jsx ya no controla TODO el renderizado.
+  // El router en main.jsx decide si mostrar App o UpdatePasswordPage.
+  // El contenido dentro de este return solo se muestra cuando la ruta coincide con App.
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-800">
       <Header
@@ -334,6 +385,7 @@ export default function App() {
         onLogin={handleLogin}
         onLogout={handleLogout}
         onSignUp={handleSignUp}
+        onPasswordResetRequest={handlePasswordResetRequest}
         cartCount={cartCount}
         onOpenCart={() => setCartOpen(true)}
         onOpenNotifications={openNotifications}
