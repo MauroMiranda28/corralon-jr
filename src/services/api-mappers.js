@@ -20,11 +20,10 @@ export const toDBProduct = (p) => ({
   category: p.category,
   price: p.price,
   stock: p.stock,
-  img: p.img || null,
+  img: p.img || null, // Correcto: guarda la URL o null si está vacía
   descripcion: p.descripcion || null,
-  is_active: p.is_active 
+  is_active: p.is_active
 });
-
 // Orders -> UI shape
 export const fromDBOrder = (o) => ({
   id: o.id,
