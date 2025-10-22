@@ -1,3 +1,5 @@
+// src/services/api-mappers.js
+
 // Products
 export const fromDBProduct = (p) => ({
   id: p.id,
@@ -6,8 +8,10 @@ export const fromDBProduct = (p) => ({
   category: p.category,
   price: p.price,
   stock: p.stock,
-  img: p.img || ""
+  img: p.img || "",
+  descripcion: p.descripcion || "" // --- AÑADIDO ---
 });
+
 export const toDBProduct = (p) => ({
   id: p.id,
   name: p.name,
@@ -15,23 +19,25 @@ export const toDBProduct = (p) => ({
   category: p.category,
   price: p.price,
   stock: p.stock,
-  img: p.img || null
+  img: p.img || null,
+  descripcion: p.descripcion || null // --- AÑADIDO --- (guarda null si está vacío)
 });
 
-// Orders -> UI shape que usa tu App
+// Orders -> UI shape
 export const fromDBOrder = (o) => ({
   id: o.id,
-  clientId: o.user_id,                                    // snake → camel
+  clientId: o.user_id,
   status: o.status,
   delivery: o.delivery || null,
   payment:  o.payment  || null,
   address:  o.address  || null,
   total: o.total,
   createdAt: o.created_at ? new Date(o.created_at).getTime() : Date.now(),
+  // Si 'items' no viene (ej: en setStatus simplificado), devuelve array vacío
   items: (o.order_items || o.items || []).map(it => ({
     id: it.id,
     productId: it.product_id,
-    qty: it.cantidad,                                     // normalizamos a qty
-    price: it.precio                                      // normalizamos a price
+    qty: it.cantidad,
+    price: it.precio
   }))
 });
