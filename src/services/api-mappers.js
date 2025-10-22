@@ -9,7 +9,8 @@ export const fromDBProduct = (p) => ({
   price: p.price,
   stock: p.stock,
   img: p.img || "",
-  descripcion: p.descripcion || "" // --- AÑADIDO ---
+  descripcion: p.descripcion || "",
+  is_active: p.is_active === undefined ? true : p.is_active
 });
 
 export const toDBProduct = (p) => ({
@@ -20,7 +21,8 @@ export const toDBProduct = (p) => ({
   price: p.price,
   stock: p.stock,
   img: p.img || null,
-  descripcion: p.descripcion || null // --- AÑADIDO --- (guarda null si está vacío)
+  descripcion: p.descripcion || null,
+  is_active: p.is_active 
 });
 
 // Orders -> UI shape

@@ -42,7 +42,17 @@ export default function App() {
   const categories = useMemo(() => ["todos", ...Array.from(new Set(products.map(p => p.category)))], [products]);
   const brands = useMemo(() => ["todas", ...Array.from(new Set(products.map(p => p.brand)))], [products]);
   const filteredProducts = useMemo(() => {
-    let filtered = products.filter(p => (q ? (p.name.toLowerCase().includes(q.toLowerCase()) || p.brand.toLowerCase().includes(q.toLowerCase())) : true) && (fCategory === "todos" ? true : p.category === fCategory) && (fBrand === "todas" ? true : p.brand === fBrand));
+  const query = q.toLowerCase();
+  let filtered = products.filter(p =>
+        (p.is_active !== false) && // Solo productos activos (o donde is_active no esté definido como false)
+       (query ? (
+           p.name.toLowerCase().includes(query) ||
+            p.brand.toLowerCase().includes(query) ||
+            (p.descripcion && p.descripcion.toLowerCase().includes(query)) // Añadir chequeo de descripción
+        ) : true) &&
+        (fCategory === "todos" ? true : p.category === fCategory) &&
+        (fBrand === "todas" ? true : p.brand === fBrand)
+    );
     const sorted = [...filtered];
     switch (sortBy) { case 'price-asc': sorted.sort((a, b) => a.price - b.price); break; case 'price-desc': sorted.sort((a, b) => b.price - a.price); break; case 'name-asc': sorted.sort((a, b) => a.name.localeCompare(b.name)); break; case 'name-desc': sorted.sort((a, b) => b.name.localeCompare(a.name)); break; default: break; }
     return sorted;

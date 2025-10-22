@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 // Quitamos UploadCloud, X ya que volvimos a la versión sin subida de imagen por ahora
-import { Edit3, Save } from "lucide-react";
+import { Edit3, Save, Eye, EyeOff } from "lucide-react";
 import TextField from "./TextField.jsx";
 import NumberField from "./NumberField.jsx";
 import { toARS, uid } from "../utils/utils.js";
@@ -11,13 +11,13 @@ import { productsApi } from "../services/products.supabase.js";
 export default function Panel({ products, setProducts }) {
   const [editing, setEditing] = useState(null);
   // --- Añadir 'descripcion' al estado del formulario ---
-  const [form, setForm] = useState({ name: "", brand: "", category: "", price: 0, stock: 0, descripcion: "" });
+  const [form, setForm] = useState({ name: "", brand: "", category: "", price: 0, stock: 0, descripcion: "", is_active: true });
   const [busy, setBusy] = useState(false);
 
   // Resetea el formulario
   function resetFormAndState() {
     setEditing(null);
-    setForm({ name: "", brand: "", category: "", price: 0, stock: 0, descripcion: "" }); // Resetear descripcion
+    setForm({ name: "", brand: "", category: "", price: 0, stock: 0, descripcion: "", is_active: true });
   }
 
   // Carga datos al empezar a editar
@@ -29,7 +29,8 @@ export default function Panel({ products, setProducts }) {
       category: p.category,
       price: p.price,
       stock: p.stock,
-      descripcion: p.descripcion || "" // Cargar descripcion existente
+      descripcion: p.descripcion || "",
+      is_active: p.is_active === undefined ? true : p.is_active 
     });
   }
 
@@ -55,6 +56,7 @@ export default function Panel({ products, setProducts }) {
         price: form.price,
         stock: form.stock,
         descripcion: form.descripcion, // Incluir descripcion en el payload
+        is_active: form.is_active, // Incluir is_active en el payload
         img: editing ? products.find(p => p.id === editing)?.img || "" : "", // Mantiene img si editaba
       };
 
@@ -102,6 +104,7 @@ export default function Panel({ products, setProducts }) {
                 <th className="p-2 text-left font-medium">Categoría</th>
                 <th className="p-2 text-right font-medium">Precio</th>
                 <th className="p-2 text-right font-medium">Stock</th>
+                <th className="p-2 text-center font-medium">Estado</th> {/* Nueva Columna Estado */}
                 <th className="p-2 text-right font-medium">Acciones</th>
                </tr>
             </thead>
@@ -113,6 +116,12 @@ export default function Panel({ products, setProducts }) {
                   <td className="p-2">{p.category}</td>
                   <td className="p-2 text-right">{toARS(p.price)}</td>
                   <td className="p-2 text-right">{p.stock}</td>
+                  {/* Mostrar Estado Activo/Inactivo */}
+                  <td className="p-2 text-center">
+                    {p.is_active === false ? <span title="Inactivo"><EyeOff className="h-4 w-4 text-red-500 inline"/></span>
+                     : <span title="Activo"><Eye className="h-4 w-4 text-emerald-500 inline"/></span>
+                    }
+                  </td>
                   <td className="p-2 text-right whitespace-nowrap">
                     <button onClick={() => startEdit(p)} className="rounded-lg border border-neutral-300 px-2 py-1 text-xs hover:bg-neutral-50 disabled:opacity-50" disabled={busy}>
                       <Edit3 className="mr-1 inline h-3 w-3" /> Editar
@@ -124,7 +133,7 @@ export default function Panel({ products, setProducts }) {
                 </tr>
               ))}
               {products.length === 0 && (
-                <tr><td className="p-4 text-center text-neutral-500" colSpan={6}>No hay productos cargados.</td></tr>
+                <tr><td className="p-4 text-center text-neutral-500" colSpan={7}>No hay productos cargados.</td></tr> 
               )}
             </tbody>
           </table>
@@ -159,7 +168,12 @@ export default function Panel({ products, setProducts }) {
             </label>
           </div>
           {/* --- FIN NUEVO CAMPO --- */}
-
+          <div className="flex items-center pt-2">
+              <input id="is_active" type="checkbox" checked={form.is_active}
+                     onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+                     className="form-checkbox h-4 w-4 text-emerald-600 rounded border-neutral-300 focus:ring-offset-0 focus:ring-emerald-500 cursor-pointer"/>
+              <label htmlFor="is_active" className="ml-2 block text-sm text-neutral-700 cursor-pointer select-none">Producto activo (visible en catálogo)</label>
+          </div>
           {/* Botones Guardar/Cancelar */}
           <div className="flex items-center justify-end gap-2 pt-4 border-t border-neutral-100">
             {editing && (

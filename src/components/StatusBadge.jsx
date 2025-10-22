@@ -3,7 +3,7 @@ import { Package, Truck, CheckCircle2, Settings } from "lucide-react";
 
 const LABEL = {
   pendiente: "Pendiente",
-  listo: "Listo",
+  listo: "Listo p/ Retiro o Envío",
   enviado: "Enviado",
   entregado: "Entregado",
 };
