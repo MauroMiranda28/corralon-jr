@@ -1,10 +1,33 @@
+// src/services/users.supabase.js
 import { supabase } from "../lib/supabase.js";
 
 export const usersApi = {
   async all() {
-    const { data, error } = await supabase.from("users").select("*").order("nombre", { ascending: true });
-    if (error) throw error;
-    // Normalizamos a { id, name, role } para que tu UI no cambie
-    return data.map(u => ({ id: u.id, name: u.nombre, role: u.rol }));
+    // --- MODIFICACIÓN: Seleccionar todos los campos ('*') ---
+    const { data, error } = await supabase
+      .from("users")
+      .select("*") // Trae id, nombre, rol, apellido, telefono Y los campos de dirección
+      .order("nombre", { ascending: true });
+    // --- FIN MODIFICACIÓN ---
+
+    if (error) {
+        console.error("Error fetching users:", error);
+        throw error;
+    }
+
+    // El mapeo ahora debería funcionar porque 'data' contiene todos los campos
+    // Asegúrate que los nombres de propiedad coincidan con las columnas de tu tabla
+    return data.map(u => ({
+         id: u.id,
+         name: u.nombre, // Columna 'nombre'
+         apellido: u.apellido, // Columna 'apellido'
+         telefono: u.telefono,   // Columna 'telefono'
+         role: u.rol, // Columna 'rol'
+         // Campos de dirección
+         direccion_ciudad: u.direccion_ciudad,
+         direccion_calle: u.direccion_calle,
+         direccion_numero: u.direccion_numero,
+         direccion_referencia: u.direccion_referencia,
+       }));
   }
 };
