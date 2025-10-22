@@ -1,10 +1,10 @@
-import React, { useEffect } from "react"; // Asegúrate de importar useEffect
+import React, { useEffect } from "react";
 
 export default function TopTabs({ tab, setTab, currentUser }) {
   let tabs = [];
-  let defaultTabKey = 'catalogo'; // Definimos una clave de pestaña por defecto general
+  let defaultTabKey = 'catalogo'; // Clave por defecto general
 
-  // --- 1. Determina las pestañas según el rol (sin hooks aquí) ---
+  // --- 1. Determina las pestañas según el rol ---
   if (!currentUser || currentUser.role === "cliente") {
     tabs = [
       { key: "catalogo", label: "Catálogo" },
@@ -15,53 +15,42 @@ export default function TopTabs({ tab, setTab, currentUser }) {
     tabs = [
       { key: "pedidos", label: "Gestionar Pedidos" },
     ];
-    defaultTabKey = 'pedidos'; // La pestaña por defecto para deposito
-  } else { // Vendedor or Admin
-    tabs = [
+    defaultTabKey = 'pedidos';
+  } else if (currentUser.role === "vendedor") { // Vendedor ahora solo ve Catálogo y Panel
+     tabs = [
       { key: "catalogo", label: "Catálogo" },
-      { key: "pedidos", label: "Pedidos" },
+      // Eliminamos la pestaña de pedidos para el vendedor
+      { key: "panel", label: "Panel Productos" },
     ];
-    if (currentUser?.role === "vendedor" || currentUser?.role === "admin") {
-      tabs.push({ key: "panel", label: "Panel Productos" });
-    }
-    if (currentUser?.role === "admin") {
-       tabs.push({ key: "reportes", label: "Reportes" });
-    }
-    defaultTabKey = 'catalogo';
+    defaultTabKey = 'catalogo'; // Mantenemos catálogo como la pestaña por defecto
+  } else if (currentUser.role === "admin") { // Admin solo ve Reportes y Administración
+    tabs = [
+       { key: "reportes", label: "Reportes" },
+       { key: "admin", label: "Administración" },
+    ];
+    defaultTabKey = 'reportes';
   }
+  // Si hubiera otros roles, irían aquí...
 
-  // --- 2. Hooks useEffect (SIEMPRE se llaman) ---
-
-  // Efecto para asegurar que 'deposito' use la pestaña 'pedidos'
+  // --- 2. Hooks useEffect (sin cambios aquí) ---
   useEffect(() => {
-    // La condición va DENTRO del efecto
     if (currentUser?.role === "deposito" && tab !== 'pedidos' && tabs.some(t => t.key === 'pedidos')) {
       setTab('pedidos');
     }
-    // Dependencias: el rol, la pestaña actual y la función para cambiarla
-  }, [currentUser?.role, tab, setTab, tabs]); // Incluir 'tabs' porque su contenido afecta la lógica
+  }, [currentUser?.role, tab, setTab, tabs]);
 
-  // Efecto para asegurar que la pestaña activa sea válida para el rol actual
   useEffect(() => {
     const currentTabExists = tabs.some(t => t.key === tab);
-    // La condición va DENTRO del efecto
     if (!currentTabExists && tabs.length > 0) {
-      // Si la pestaña actual no existe para este rol,
-      // busca la pestaña por defecto definida arriba
       setTab(defaultTabKey);
     }
-    // Dependencias: la pestaña actual, el array de pestañas calculado, la pestaña por defecto y la función
   }, [tab, tabs, defaultTabKey, setTab]);
 
-
-  // --- 3. Lógica de Renderizado ---
-
-  // Si no hay pestañas para el rol actual (poco probable, pero seguro)
+  // --- 3. Lógica de Renderizado (sin cambios aquí) ---
   if (tabs.length === 0) {
       return null;
   }
 
-  // Determina qué pestaña resaltar AHORA (antes de que los efectos actualicen 'tab')
   const currentTabExistsNow = tabs.some(t => t.key === tab);
   const effectiveTabKey = currentTabExistsNow ? tab : defaultTabKey;
 
@@ -73,7 +62,7 @@ export default function TopTabs({ tab, setTab, currentUser }) {
             key={t.key}
             onClick={() => setTab(t.key)}
             className={`whitespace-nowrap rounded-full px-4 py-2 text-sm transition ${
-              t.key === effectiveTabKey // Compara con la clave efectiva
+              t.key === effectiveTabKey
                ? "bg-neutral-900 text-white"
                : "hover:bg-neutral-100"
             }`}

@@ -29,5 +29,22 @@ export const usersApi = {
          direccion_numero: u.direccion_numero,
          direccion_referencia: u.direccion_referencia,
        }));
+  },
+
+  // --- NUEVA FUNCIÓN ---
+  async adminUpdateUserRole(userId, newRole) {
+    const { data, error } = await supabase
+      .from("users")
+      .update({ rol: newRole })
+      .eq("id", userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error(`Error updating role for user ${userId}:`, error);
+      throw error;
+    }
+    return data;
   }
+  // --- FIN NUEVA FUNCIÓN ---
 };

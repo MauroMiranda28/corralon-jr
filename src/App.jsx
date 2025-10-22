@@ -8,6 +8,7 @@ import Panel from "./components/Panel.jsx";
 import Reports from "./components/Reports.jsx";
 import TopTabs from "./components/TopTabs.jsx";
 import NotificationsDrawer from "./components/NotificationsDrawer.jsx";
+import AdminPanel from "./components/AdminPanel.jsx"; // --- NUEVO ---
 
 // --- Imports de Supabase ---
 import { productsApi as ProductsSB } from "./services/products.supabase.js";
@@ -16,6 +17,12 @@ import { usersApi as UsersSB } from "./services/users.supabase.js";
 import { supabase } from "./lib/supabase.js";
 
 import { toARS, uid } from "./utils/utils.js";
+
+// --- NUEVO: Imports de Reportes ---
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+// --- FIN NUEVO ---
 
 export default function App() {
   // --- Estados ---
@@ -34,8 +41,15 @@ export default function App() {
   const [fCategory, setFCategory] = useState("todos");
   const [fBrand, setFBrand] = useState("todas");
   const [sortBy, setSortBy] = useState("default");
-  const [shippingCostBase] = useState(500);
+  
+  // --- MODIFICADO: Costo de envío ahora es un estado ---
+  const [shippingCostBase, setShippingCostBase] = useState(500); 
+  
   const [openLogin, setOpenLogin] = useState(false);
+
+  // --- NUEVO: Estados para filtros de reporte ---
+  const [fechaDesde, setFechaDesde] = useState(null);
+  const [fechaHasta, setFechaHasta] = useState(null);
 
   // --- Memos ---
   const canSeeStock = !!currentUser && currentUser.role !== "cliente";
@@ -56,7 +70,7 @@ export default function App() {
         (fBrand === "todas" ? true : p.brand === fBrand)
     );
     const sorted = [...filtered];
-    switch (sortBy) { case 'price-asc': sorted.sort((a, b) => a.price - b.price); break; case 'price-desc': sorted.sort((a, b) => b.price - a.price); break; case 'name-asc': sorted.sort((a, b) => a.name.localeCompare(b.name)); break; case 'name-desc': sorted.sort((a, b) => b.name.localeCompare(a.name)); break; default: break; }
+    switch (sortBy) { case 'price-asc': sorted.sort((a, b) => a.price - b.price); break; case 'price-desc': sorted.sort((a, b) => b.price - b.price); break; case 'name-asc': sorted.sort((a, b) => a.name.localeCompare(b.name)); break; case 'name-desc': sorted.sort((a, b) => b.name.localeCompare(a.name)); break; default: break; }
     return sorted;
   }, [products, q, fCategory, fBrand, sortBy]);
 
@@ -64,12 +78,27 @@ export default function App() {
   const navigate = useNavigate();
 
   // --- Effects ---
-  // Carga inicial (ahora UsersSB.all() trae todo)
+  // MODIFICADO: Carga inicial (incluye costo de envío)
   useEffect(() => {
     (async () => {
       try {
         const [p, o, u] = await Promise.all([ProductsSB.all(), OrdersSB.all(), UsersSB.all()]);
         setProducts(p); setOrders(o); setUsers(u);
+
+        // --- NUEVO: Cargar costo de envío ---
+        const { data: configData, error: configError } = await supabase
+          .from('configuracion')
+          .select('value')
+          .eq('key', 'costo_envio')
+          .single();
+        
+        if (configError && configError.code !== 'PGRST116') { // PGRST116 = no rows found
+            console.error("Error cargando config:", configError);
+        } else if (configData) {
+            setShippingCostBase(Number(configData.value) || 500);
+        }
+        // --- FIN NUEVO ---
+
       } catch (err) { console.error("Error cargando datos:", err); alert("No pude cargar datos."); }
     })();
   }, []);
@@ -79,7 +108,7 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (e, cSess) => { if (e === 'PASSWORD_RECOVERY' && cSess) { navigate('/update-password'); } else { setSession(cSess); } });
     return () => subscription.unsubscribe();
   }, [navigate]);
-  // Buscar Perfil (ahora debería encontrar la dirección en 'users')
+  // Buscar Perfil (sin cambios)
   useEffect(() => {
     if (session?.user && users.length > 0) {
       const profileFromList = users.find((u) => u.id === session.user.id);
@@ -100,23 +129,20 @@ export default function App() {
     } else if (!session) { setCurrentUser(null); }
   }, [session, users]);
 
-  // --- Helpers Carrito ---
+  // --- Helpers Carrito (sin cambios) ---
   function addToCart(productId) { const p = products.find(p => p.id === productId); if (!p) return; const i = cart.find(it => it.productId === productId); if (i) { if (i.qty + 1 > p.stock) return alert("Stock insuficiente"); setCart(cart.map(it => (it.productId === productId ? { ...it, qty: it.qty + 1 } : it))); } else { if (p.stock < 1) return alert("Sin stock"); setCart([...cart, { productId, qty: 1 }]); } }
   function changeQty(productId, delta) { setCart(prev => prev.flatMap(it => { if (it.productId !== productId) return [it]; const nQ = it.qty + delta; if (nQ <= 0) return []; const p = products.find(p => p.id === productId); if (p && nQ > p.stock) { alert("Stock insuficiente"); return [it]; } return [{ ...it, qty: nQ }]; })); }
   function removeFromCart(productId) { setCart(cart.filter(it => it.productId !== productId)); }
 
-  // --- Funciones Pedido ---
-  // --- MODIFICADO: confirmOrder recibe datos de entrega ---
+  // --- Funciones Pedido (sin cambios) ---
   async function confirmOrder(deliveryDetails) {
-    // deliveryDetails = { method: 'retiro' | 'domicilio', address: { ciudad, calle, numero, referencia, recibeNombre, recibeApellido, recibeDni }, saveAddress: boolean }
     if (!currentUser || currentUser.role !== "cliente") {
         setCartOpen(false)
         setTimeout(() => setOpenLogin(true), 100); // Abre el modal de login
-        return; // Detiene la ejecución
+        return; 
     }
     if (!cart.length) return alert("Carrito vacío");
 
-    // Validar campos obligatorios de dirección si es envío a domicilio
     if (deliveryDetails.method === 'domicilio' && (
         !deliveryDetails.address?.ciudad?.trim() ||
         !deliveryDetails.address?.calle?.trim() ||
@@ -125,14 +151,10 @@ export default function App() {
         !deliveryDetails.address?.recibeApellido?.trim() ||
         !deliveryDetails.address?.recibeDni?.trim()
         )) {
-        // Devuelve el error para que CartDrawer lo muestre
         throw new Error("Completa todos los campos obligatorios (*) de la dirección y quién recibe.");
     }
-
-    // (Validación de stock - sin cambios)
     for (const it of cart) { const p = products.find(p => p.id === it.productId); if (!p || p.stock < it.qty) throw new Error(`Stock insuficiente: ${p?.name || it.productId}`); }
 
-    // Formatear dirección para guardar en el pedido (incluye quién recibe)
     let orderAddressString = null;
     if (deliveryDetails.method === 'domicilio') {
         const addr = deliveryDetails.address;
@@ -140,16 +162,13 @@ export default function App() {
     }
 
     try {
-      // 1. Guardar dirección en perfil si se marcó
       if (deliveryDetails.method === 'domicilio' && deliveryDetails.saveAddress) {
-        // Solo guardamos la dirección del domicilio, no quién recibe
         await saveUserAddress({
             ciudad: deliveryDetails.address.ciudad,
             calle: deliveryDetails.address.calle,
             numero: deliveryDetails.address.numero,
             referencia: deliveryDetails.address.referencia
         });
-        // Actualizar currentUser localmente para reflejar el guardado
         setCurrentUser(prev => ({
             ...prev,
             direccion_ciudad: deliveryDetails.address.ciudad,
@@ -159,7 +178,6 @@ export default function App() {
         }));
       }
 
-      // 2. Crear el pedido
       const orderUi = {
         id: uid("ord"),
         clientId: currentUser.id,
@@ -169,8 +187,6 @@ export default function App() {
         items: cart.map(it => ({ id: uid("itm"), productId: it.productId, qty: it.qty, price: products.find(p => p.id === it.productId)?.price || 0 }))
       };
       const createdOrder = await OrdersSB.create(orderUi);
-
-      // 3. Refrescar datos y limpiar carrito
       const updatedProducts = await ProductsSB.all();
       setProducts(updatedProducts);
       setOrders(prevOrders => [createdOrder, ...prevOrders]);
@@ -180,16 +196,11 @@ export default function App() {
 
     } catch (e) {
       console.error("Error confirmando pedido:", e);
-      // Lanza el error para que CartDrawer lo pueda atrapar si es necesario
       throw new Error("Error al confirmar el pedido: " + e.message);
     }
   }
-  // --- FIN MODIFICACIÓN ---
-
-  // --- NUEVA FUNCIÓN: Guardar dirección en perfil ---
   async function saveUserAddress(addressToSave) {
     if (!currentUser) return;
-    console.log("Saving address for user:", currentUser.id, addressToSave);
     const { data, error } = await supabase
       .from('users')
       .update({
@@ -199,35 +210,160 @@ export default function App() {
         direccion_referencia: addressToSave.referencia,
       })
       .eq('id', currentUser.id)
-      .select() // Pedimos la fila actualizada
-      .single(); // Esperamos solo una
-
+      .select() 
+      .single(); 
     if (error) {
       console.error("Error saving user address:", error);
-      // Considera no mostrar alert aquí para no interrumpir el flujo del pedido
-      // alert("Hubo un problema al guardar tu dirección, pero el pedido continúa.");
-      // Lanza el error para que confirmOrder lo sepa (opcional)
-      // throw new Error("Error al guardar la dirección.");
     } else {
         console.log("User address saved successfully.");
-        // Actualizar la lista 'users' localmente
         setUsers(prevUsers => prevUsers.map(u => u.id === currentUser.id ? {...u, ...data} : u));
-        // Actualizar currentUser directamente también
         setCurrentUser(prev => ({...prev, ...data}));
     }
   }
-  // --- FIN NUEVA FUNCIÓN ---
-
-  // Otras funciones
   async function setOrderStatus(oid, newStatus) { try { const r = await OrdersSB.setStatus(oid, newStatus); if (newStatus === 'entregado') { await supabase.from('orders').update({ delivery_confirmed_at: new Date().toISOString() }).eq('id', oid); } setOrders(prev => { const i = prev.findIndex(o => o.id === oid); if (i < 0) return prev; const nO = [...prev]; const eO = nO[i]; nO[i] = { ...eO, ...r, status: newStatus, delivery_confirmed_at: newStatus === 'entregado' ? new Date().toISOString() : eO.delivery_confirmed_at }; return nO; }); setNotifications(prev => [{ id: uid("ntf"), text: `Pedido ${oid.slice(-6)} ${newStatus}`, ts: Date.now(), read: false }, ...prev].slice(0, 50)); } catch (e) { console.error(`Error status ${oid}:`, e); alert("No pude actualizar estado."); } }
   function ordersForUser() { if (!currentUser) return []; if (currentUser.role === "cliente") return orders.filter(o => o.clientId === currentUser.id); return orders; }
-  function handleExportCSV() { const h = ["id", "cliente", "estado", "fecha", "total"]; const r = orders.map(o => [ o.id, users.find(u => u.id === o.clientId)?.name || o.clientId, o.status, new Date(o.createdAt).toLocaleString(), o.total ]); const c = [h.join(","), ...r.map(r => r.join(","))].join("\n"); const b = new Blob([c], { type: "text/csv;charset=utf-8;" }); const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = "pedidos.csv"; a.click(); URL.revokeObjectURL(u); }
-  const ventasPorProducto = useMemo(() => { const e = orders.filter(o => o.status === "entregado"); const a = new Map(); for (const o of e) { for (const it of o.items) { const p = products.find(x => x.id === it.productId); const k = p ? p.name : `ID: ${it.productId}`; const v = a.get(k) || 0; a.set(k, v + it.qty * it.price); } } return Array.from(a.entries()).map(([name, total]) => ({ name, total })); }, [orders, products]);
+  
+  // --- MODIFICADO: Memos de Reportes (RF08.3) ---
+  
+  // 1. Filtra pedidos por fecha
+  const filteredOrdersByDate = useMemo(() => {
+    return orders.filter(o => {
+      const orderDate = new Date(o.createdAt);
+      // Filtro "Desde"
+      if (fechaDesde) {
+        const fromDate = new Date(fechaDesde);
+        fromDate.setHours(0, 0, 0, 0); // Inicio del día
+        if (orderDate < fromDate) return false;
+      }
+      // Filtro "Hasta"
+      if (fechaHasta) {
+        const toDate = new Date(fechaHasta);
+        toDate.setHours(23, 59, 59, 999); // Fin del día
+        if (orderDate > toDate) return false;
+      }
+      return true;
+    });
+  }, [orders, fechaDesde, fechaHasta]);
+  
+  // 2. Reporte: Ventas por producto (usa pedidos filtrados)
+  const ventasPorProducto = useMemo(() => { 
+    const e = filteredOrdersByDate.filter(o => o.status === "entregado"); 
+    const a = new Map(); 
+    for (const o of e) { for (const it of o.items) { const p = products.find(x => x.id === it.productId); const k = p ? p.name : `ID: ${it.productId}`; const v = a.get(k) || 0; a.set(k, v + it.qty * it.price); } } 
+    return Array.from(a.entries()).map(([name, total]) => ({ name, total: Number(total.toFixed(2)) })); 
+  }, [filteredOrdersByDate, products]);
+  
+  // 3. Reporte: Picos de demanda (usa pedidos filtrados)
+  const picosDeDemanda = useMemo(() => {
+    const e = filteredOrdersByDate; // Todos los pedidos en el rango
+    const a = new Map();
+    for (const o of e) {
+      const dia = new Date(o.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const v = a.get(dia) || { pedidos: 0, total: 0 };
+      v.pedidos += 1;
+      v.total += o.total;
+      a.set(dia, v);
+    }
+    return Array.from(a.entries())
+      .map(([name, data]) => ({ name, pedidos: data.pedidos, total: Number(data.total.toFixed(2)) }))
+      .sort((a, b) => new Date(a.name.split('/').reverse().join('-')) - new Date(b.name.split('/').reverse().join('-')));
+  }, [filteredOrdersByDate]);
+  
+  // --- FIN MODIFICACIÓN ---
+
+  // --- Funciones de Autenticación (sin cambios) ---
   async function handleLogin(email, password) { try { setLoadingSession(true); const { error } = await supabase.auth.signInWithPassword({ email, password }); if (error) throw error; } catch (error) { console.error("Login Error:", error.message); alert("Error: " + error.message); } finally { setLoadingSession(false); } }
   async function handleLogout() { try { setLoadingSession(true); const { error } = await supabase.auth.signOut(); if (error) throw error; setCart([]); } catch (error) { console.error("Logout Error:", error.message); alert("Error: " + error.message); } finally { setLoadingSession(false); } }
   async function handleSignUp(email, password, nombre, apellido, telefono) { try { setLoadingSession(true); const { error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: nombre, last_name: apellido, phone: telefono } } }); if (error) throw error; alert(`Registro exitoso! Confirma tu correo (${email}).`); setTimeout(async () => { const u = await UsersSB.all(); setUsers(u); }, 1500); } catch (error) { console.error("Signup Error:", error.message); alert("Error: " + error.message); } finally { setLoadingSession(false); } }
   async function handlePasswordResetRequest(email) { try { setLoadingSession(true); const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/update-password` }); if (error) throw error; alert(`Si ${email} está registrado, recibirás correo.`); } catch (error) { console.error("Reset Request Error:", error.message); alert(`Error. Intenta de nuevo.`); } finally { setLoadingSession(false); } }
   function openNotifications() { setNotificationsOpen(true); setNotifications(prev => prev.map(n => ({ ...n, read: true }))); }
+  
+  // --- NUEVAS FUNCIONES: Admin y Reportes (RF08.1, RF08.2, RF08.3) ---
+
+  async function handleSaveShippingCost(newValue) {
+    try {
+      // Asumimos que solo hay una fila con key 'costo_envio'
+      const { error } = await supabase
+        .from('configuracion')
+        .update({ value: newValue })
+        .eq('key', 'costo_envio');
+      if (error) throw error;
+      setShippingCostBase(newValue);
+      alert('Costo de envío actualizado');
+    } catch (e) {
+      console.error("Error guardando costo de envío:", e);
+      alert("No se pudo guardar el costo de envío.");
+      throw e; // Lanza para que el componente sepa que falló
+    }
+  }
+
+  async function handleUpdateUserRole(userId, newRole) {
+    try {
+      const updatedUser = await UsersSB.adminUpdateUserRole(userId, newRole);
+      // Actualizar el estado local 'users'
+      setUsers(prevUsers => prevUsers.map(u => 
+        u.id === userId ? { ...u, role: updatedUser.rol } : u
+      ));
+      alert('Rol de usuario actualizado');
+    } catch (e) {
+      console.error("Error actualizando rol:", e);
+      alert("No se pudo actualizar el rol.");
+      throw e; // Lanza para que el componente sepa que falló
+    }
+  }
+
+  function handleExportExcel(data, fileName) {
+    try {
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Reporte");
+      XLSX.writeFile(wb, `${fileName}.xlsx`);
+    } catch(e) {
+      console.error("Error exportando a Excel:", e);
+      alert("No se pudo generar el archivo Excel.");
+    }
+  }
+
+  // --- Restaurar función Exportar CSV para OrdersView ---
+  function handleExportCSV() {
+    const h = ["id", "cliente", "estado", "fecha", "total", "metodo_entrega", "direccion_envio"]; // Añadir columnas
+    const r = ordersForUser().map(o => { // Usar ordersForUser() para respetar el rol
+      const clientName = users.find(u => u.id === o.clientId)?.name || o.clientId;
+      return [
+        o.id,
+        clientName,
+        o.status,
+        new Date(o.createdAt).toLocaleString(),
+        o.total,
+        o.delivery === 'domicilio' ? 'A Domicilio' : 'Retiro en Corralón', // Mapear valor
+        o.address || '' // Incluir dirección o vacío
+      ];
+    });
+    // Formatear valores para CSV (escapar comas si existen en los nombres o direcciones)
+    const formatRow = (row) => row.map(val => {
+      const strVal = String(val);
+      // Si el valor contiene comas, comillas dobles o saltos de línea, encerrarlo entre comillas dobles
+      if (strVal.includes(',') || strVal.includes('"') || strVal.includes('\n')) {
+        // Escapar comillas dobles existentes duplicándolas
+        return `"${strVal.replace(/"/g, '""')}"`;
+      }
+      return strVal;
+    }).join(",");
+
+    const c = [formatRow(h), ...r.map(formatRow)].join("\n");
+    const b = new Blob(["\uFEFF" + c], { type: "text/csv;charset=utf-8;" }); // Añadir BOM para Excel
+    const u = URL.createObjectURL(b);
+    const a = document.createElement("a");
+    a.href = u;
+    a.download = "pedidos.csv";
+    document.body.appendChild(a); // Necesario en algunos navegadores
+    a.click();
+    document.body.removeChild(a); // Limpiar
+    URL.revokeObjectURL(u);
+  }
+  // --- Fin Restaurar ---
+  
+  // --- FIN NUEVAS FUNCIONES ---
 
   // --- RENDERIZADO ---
   if (loadingSession) { return <div className="grid h-screen place-content-center bg-neutral-50"><h1 className="text-lg font-semibold">Cargando...</h1></div>; }
@@ -237,10 +373,39 @@ export default function App() {
       <Header currentUser={currentUser} users={users} onLogin={handleLogin} onLogout={handleLogout} onSignUp={handleSignUp} onPasswordResetRequest={handlePasswordResetRequest} cartCount={cartCount} onOpenCart={() => setCartOpen(true)} onOpenNotifications={openNotifications} openLogin={openLogin} setOpenLogin={setOpenLogin} />
       <main className="mx-auto max-w-7xl px-4 pb-24">
         <TopTabs tab={tab} setTab={setTab} currentUser={currentUser} />
+        
         {tab === "catalogo" && <Catalog products={filteredProducts} allProducts={products} q={q} setQ={setQ} fCategory={fCategory} setFCategory={setFCategory} fBrand={fBrand} setFBrand={setFBrand} categories={categories} brands={brands} addToCart={addToCart} canSeeStock={canSeeStock} sortBy={sortBy} setSortBy={setSortBy} />}
+        
         {tab === "pedidos" && <OrdersView orders={ordersForUser()} users={users} products={products} currentUser={currentUser} onStatusChange={setOrderStatus} onExportCSV={handleExportCSV} />}
+        
         {tab === "panel" && (currentUser?.role === "vendedor" || currentUser?.role === "admin") && <Panel products={products} setProducts={setProducts} orders={orders} setOrderStatus={setOrderStatus} users={users} />}
-        {tab === "reportes" && currentUser?.role === "admin" && <Reports ventasPorProducto={ventasPorProducto} />}
+        
+        {/* --- MODIFICADO: Renderizado de Reportes --- */}
+        {tab === "reportes" && currentUser?.role === "admin" && (
+          <Reports 
+            ventasPorProducto={ventasPorProducto} 
+            picosDeDemanda={picosDeDemanda}
+            onExportExcel={handleExportExcel}
+            onExportPDF={handleExportPDF}
+            fechaDesde={fechaDesde}
+            setFechaDesde={setFechaDesde}
+            fechaHasta={fechaHasta}
+            setFechaHasta={setFechaHasta}
+          />
+        )}
+        {/* --- FIN MODIFICACIÓN --- */}
+
+        {/* --- NUEVO: Renderizado de Panel Admin --- */}
+        {tab === "admin" && currentUser?.role === "admin" && (
+          <AdminPanel
+            users={users}
+            onUpdateUserRole={handleUpdateUserRole}
+            shippingCostBase={shippingCostBase}
+            onSaveShippingCost={handleSaveShippingCost}
+          />
+        )}
+        {/* --- FIN NUEVO --- */}
+
       </main>
       <CartDrawer
         open={cartOpen}
@@ -253,7 +418,6 @@ export default function App() {
         onConfirm={confirmOrder} // Pasa la función modificada
         canSeeStock={canSeeStock}
         shippingCostBase={shippingCostBase}
-        // Pasamos la dirección guardada del usuario para pre-rellenar
         savedAddress={ currentUser ? { // Solo si currentUser existe
             ciudad: currentUser.direccion_ciudad,
             calle: currentUser.direccion_calle,
