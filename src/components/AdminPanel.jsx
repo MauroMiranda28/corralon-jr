@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import NumberField from "./NumberField.jsx";
 import { Save, UserCog, Send } from "lucide-react";
 
-// Componente para una fila de usuario
+// Componente UserRow (sin cambios aquí)
 function UserRow({ user, onUpdateUserRole }) {
   const [selectedRole, setSelectedRole] = useState(user.role || 'cliente');
   const [isUpdating, setIsUpdating] = useState(false);
@@ -18,15 +18,13 @@ function UserRow({ user, onUpdateUserRole }) {
     try {
       await onUpdateUserRole(user.id, selectedRole);
     } catch (error) {
-      // El error se maneja en App.jsx
       setSelectedRole(user.role); // Revertir si falla
     } finally {
       setIsUpdating(false);
     }
   };
 
-  // Asumimos que la API (usersApi.all) ahora trae más campos
-  const email = user.id; // Placeholder, idealmente vendría de la API
+  const email = user.id; // Asume ID es email, idealmente vendría de API
   const name = user.name || 'N/A';
   const lastName = user.apellido || '';
 
@@ -41,7 +39,7 @@ function UserRow({ user, onUpdateUserRole }) {
           disabled={isUpdating}
           className="rounded-md border border-neutral-200 px-2 py-1 text-sm"
         >
-          <option value="cliente">Cliente</option>
+          {/* <option value="cliente">Cliente</option> */} {/* Opcional: Ocultar Cliente aquí también */}
           <option value="vendedor">Vendedor</option>
           <option value="deposito">Depósito</option>
           <option value="admin">Admin</option>
@@ -75,12 +73,16 @@ export default function AdminPanel({ users, onUpdateUserRole, shippingCostBase, 
     }
   };
 
+  // --- >>> FILTRAR USUARIOS ANTES DE RENDERIZAR <<< ---
+  const employeeUsers = users.filter(user => user.role !== 'cliente');
+  // --- >>> FIN FILTRADO <<< ---
+
   return (
     <section className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
       {/* Columna de Gestión de Usuarios */}
       <div className="lg:col-span-2">
         <h3 className="mb-3 text-lg font-semibold flex items-center gap-2">
-          <UserCog className="h-5 w-5" /> Gestión de Usuarios
+          <UserCog className="h-5 w-5" /> Gestión de Empleados {/* Cambiado título para claridad */}
         </h3>
         <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white">
           <table className="w-full text-sm min-w-[600px]">
@@ -93,13 +95,17 @@ export default function AdminPanel({ users, onUpdateUserRole, shippingCostBase, 
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
+              {/* --- >>> USAR LA LISTA FILTRADA EN EL MAP <<< --- */}
+              {employeeUsers.map((u) => (
                 <UserRow key={u.id} user={u} onUpdateUserRole={onUpdateUserRole} />
               ))}
-              {users.length === 0 && (
+              {/* --- >>> FIN CAMBIO MAP <<< --- */}
+
+              {/* Mensaje si no hay empleados */}
+              {employeeUsers.length === 0 && (
                 <tr>
                   <td className="p-4 text-center text-neutral-500" colSpan={4}>
-                    No hay usuarios cargados.
+                    No hay empleados (vendedor, depósito, admin) cargados.
                   </td>
                 </tr>
               )}
@@ -108,7 +114,7 @@ export default function AdminPanel({ users, onUpdateUserRole, shippingCostBase, 
         </div>
       </div>
 
-      {/* Columna de Configuración */}
+      {/* Columna de Configuración (sin cambios) */}
       <div>
         <h3 className="mb-3 text-lg font-semibold flex items-center gap-2">
           <Send className="h-5 w-5" /> Configuración de Parámetros

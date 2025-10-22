@@ -28,6 +28,7 @@ export const usersApi = {
          direccion_calle: u.direccion_calle,
          direccion_numero: u.direccion_numero,
          direccion_referencia: u.direccion_referencia,
+         email: u.email // <-- Necesitamos añadir esto si tu tabla 'users' lo tiene
        }));
   },
 
