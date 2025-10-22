@@ -10,8 +10,8 @@ const PHONE_REGEX = /^(?:(?:\+?54)?(?:0?11|[2368]\d{2,3})?)?[1-9]\d{6,7}$/;
 // Regex para contraseña: mín 6, máx 30, al menos una letra, al menos un número, sin espacios.
 const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,30}$/;
 
-export default function Header({ currentUser, users, onLogin, onLogout, onSignUp, onPasswordResetRequest, cartCount, onOpenCart, onOpenNotifications }) {
-  const [openLogin, setOpenLogin] = useState(false);
+export default function Header({ currentUser, users, onLogin, onLogout, onSignUp, onPasswordResetRequest, cartCount, onOpenCart, onOpenNotifications, openLogin, setOpenLogin }) {
+  // const [openLogin, setOpenLogin] = useState(false);
 
   // Estados del modal
   const [view, setView] = useState("login");

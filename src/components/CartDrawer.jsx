@@ -8,7 +8,8 @@ export default function CartDrawer({
   open, onClose, cart, products, changeQty, removeFromCart, total, // 'total' es el subtotal
   onConfirm, // Recibirá { method, address: { ciudad, calle, numero, referencia, recibeNombre, recibeApellido, recibeDni }, saveAddress }
   canSeeStock,
-  savedAddress // Dirección guardada del perfil: { ciudad, calle, numero, referencia }
+  savedAddress,
+  shippingCostBase // Dirección guardada del perfil: { ciudad, calle, numero, referencia }
 }) {
   // --- Estados para Entrega y Dirección ---
   const [deliveryMethod, setDeliveryMethod] = useState('retiro'); // 'retiro' o 'domicilio'
@@ -52,7 +53,7 @@ export default function CartDrawer({
   };
 
   // --- Lógica de Costo de Envío (Placeholder) ---
-  const shippingCost = deliveryMethod === 'domicilio' ? 500 : 0; // Ejemplo
+  const shippingCost = deliveryMethod === 'domicilio' ? shippingCostBase : 0 // Ejemplo
   const isShippingCalculated = true;
   // --- Fin Placeholder ---
 

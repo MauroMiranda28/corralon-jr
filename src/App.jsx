@@ -34,6 +34,8 @@ export default function App() {
   const [fCategory, setFCategory] = useState("todos");
   const [fBrand, setFBrand] = useState("todas");
   const [sortBy, setSortBy] = useState("default");
+  const [shippingCostBase] = useState(500);
+  const [openLogin, setOpenLogin] = useState(false);
 
   // --- Memos ---
   const canSeeStock = !!currentUser && currentUser.role !== "cliente";
@@ -107,7 +109,11 @@ export default function App() {
   // --- MODIFICADO: confirmOrder recibe datos de entrega ---
   async function confirmOrder(deliveryDetails) {
     // deliveryDetails = { method: 'retiro' | 'domicilio', address: { ciudad, calle, numero, referencia, recibeNombre, recibeApellido, recibeDni }, saveAddress: boolean }
-    if (!currentUser || currentUser.role !== "cliente") return alert("Ingresá como Cliente");
+    if (!currentUser || currentUser.role !== "cliente") {
+        setCartOpen(false)
+        setTimeout(() => setOpenLogin(true), 100); // Abre el modal de login
+        return; // Detiene la ejecución
+    }
     if (!cart.length) return alert("Carrito vacío");
 
     // Validar campos obligatorios de dirección si es envío a domicilio
@@ -228,7 +234,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-800">
-      <Header currentUser={currentUser} users={users} onLogin={handleLogin} onLogout={handleLogout} onSignUp={handleSignUp} onPasswordResetRequest={handlePasswordResetRequest} cartCount={cartCount} onOpenCart={() => setCartOpen(true)} onOpenNotifications={openNotifications} />
+      <Header currentUser={currentUser} users={users} onLogin={handleLogin} onLogout={handleLogout} onSignUp={handleSignUp} onPasswordResetRequest={handlePasswordResetRequest} cartCount={cartCount} onOpenCart={() => setCartOpen(true)} onOpenNotifications={openNotifications} openLogin={openLogin} setOpenLogin={setOpenLogin} />
       <main className="mx-auto max-w-7xl px-4 pb-24">
         <TopTabs tab={tab} setTab={setTab} currentUser={currentUser} />
         {tab === "catalogo" && <Catalog products={filteredProducts} allProducts={products} q={q} setQ={setQ} fCategory={fCategory} setFCategory={setFCategory} fBrand={fBrand} setFBrand={setFBrand} categories={categories} brands={brands} addToCart={addToCart} canSeeStock={canSeeStock} sortBy={sortBy} setSortBy={setSortBy} />}
@@ -246,6 +252,7 @@ export default function App() {
         total={cartTotal} // Subtotal
         onConfirm={confirmOrder} // Pasa la función modificada
         canSeeStock={canSeeStock}
+        shippingCostBase={shippingCostBase}
         // Pasamos la dirección guardada del usuario para pre-rellenar
         savedAddress={ currentUser ? { // Solo si currentUser existe
             ciudad: currentUser.direccion_ciudad,
