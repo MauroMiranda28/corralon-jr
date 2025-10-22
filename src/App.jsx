@@ -361,6 +361,27 @@ export default function App() {
     document.body.removeChild(a); // Limpiar
     URL.revokeObjectURL(u);
   }
+
+  function handleExportPDF(data, title, columns) {
+   try {
+     const doc = new jsPDF();
+     doc.text(title, 14, 15);
+     doc.autoTable({
+       startY: 20,
+       head: [columns.map(c => c.header)],
+       body: data.map(row => columns.map(c => {
+         const value = row[c.dataKey];
+         // Formatear si es número (ej. total)
+         if (typeof value === 'number') return toARS(value);
+         return value;
+       })),
+     });
+     doc.save(`${title.replace(/ /g, '_')}.pdf`);
+   } catch(e) {
+     console.error("Error exportando a PDF:", e);
+     alert("No se pudo generar el archivo PDF.");
+   }
+}
   // --- Fin Restaurar ---
   
   // --- FIN NUEVAS FUNCIONES ---
