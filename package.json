@@ -10,7 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@mercadopago/sdk-js": "^0.0.3",
     "@supabase/supabase-js": "^2.75.0",
+    "axios": "^1.12.2",
     "framer-motion": "^12.23.12",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
