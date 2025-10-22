@@ -382,6 +382,61 @@ export default function App() {
      alert("No se pudo generar el archivo PDF.");
    }
 }
+
+// Dentro de App.jsx
+async function handleAdminCreateUser(email, password, nombre, apellido, telefono, role) {
+  if (!['vendedor', 'deposito', 'admin'].includes(role)) {
+     alert('Rol inválido seleccionado.');
+     throw new Error('Rol inválido');
+  }
+
+  console.log("Intentando crear usuario:", { email, nombre, apellido, telefono, role }); // <-- LOG 1
+
+  setLoadingSession(true);
+  try {
+    console.log("Llamando a supabase.auth.signUp..."); // <-- LOG 2
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: nombre,
+          last_name: apellido,
+          phone: telefono,
+          role: role
+        }
+      }
+    });
+
+    console.log("Respuesta de signUp:", { data, error }); // <-- LOG 3
+
+    if (error) {
+       console.error("Error DETECTADO en signUp:", error); // <-- LOG 4
+       throw error; // Esto debería lanzar el error al catch
+    }
+
+    // Si llega aquí, signUp no devolvió un error explícito
+    console.log("signUp parece haber funcionado, data:", data); // <-- LOG 5
+    alert(`Cuenta de empleado creada (aparentemente) para ${email}. Verifica en Supabase Auth.`); // Mensaje más cauto
+
+    setTimeout(async () => {
+      console.log("Refrescando lista de usuarios..."); // <-- LOG 6
+      const u = await UsersSB.all();
+      setUsers(u);
+    }, 1500);
+
+    return data;
+
+  } catch (error) { // Este catch debería atrapar el 'throw error'
+    console.error("ERROR CAPTURADO en handleAdminCreateUser:", error); // <-- LOG 7
+    // El alert original ya está aquí
+    alert("Error creando cuenta: " + error.message);
+    throw error; // Re-lanzar para AdminPanel si es necesario
+  } finally {
+    console.log("Finalizando handleAdminCreateUser."); // <-- LOG 8
+    setLoadingSession(false);
+  }
+}
   // --- Fin Restaurar ---
   
   // --- FIN NUEVAS FUNCIONES ---
@@ -423,6 +478,7 @@ export default function App() {
             onUpdateUserRole={handleUpdateUserRole}
             shippingCostBase={shippingCostBase}
             onSaveShippingCost={handleSaveShippingCost}
+            onAdminCreateUser={handleAdminCreateUser}
           />
         )}
         {/* --- FIN NUEVO --- */}
